@@ -78,7 +78,7 @@ public class Player : MonoBehaviour
     }
 
     // Метод, вызываемый системой ввода при прыжке
-    private void OnJump()
+    public void OnJump()
     {
         if (_isGrounded == true) // Прыжок возможен только если игрок на земле
         {

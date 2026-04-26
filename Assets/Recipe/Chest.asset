@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b952adb28483cef4a9030b87fa9b7417, type: 3}
-  m_Name: Recipe
+  m_Name: Chest
   m_EditorClassIdentifier: Assembly-CSharp::Recipe
-  ItemsForCraft: 
-  ResultObject: {fileID: 0}
+  ItemsForCraft: 0000000002000000
+  ResultObject: {fileID: 1309955378583662754, guid: 92de55bb476fc6c49810e472277cb5e9, type: 3}

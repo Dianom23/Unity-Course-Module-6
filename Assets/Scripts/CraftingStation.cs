@@ -1,137 +1,132 @@
-using UnityEngine; // Подключаем основную библиотеку Unity
-using UnityEngine.InputSystem; // Подключаем новую систему ввода
+using UnityEngine;
+using System.Collections.Generic; // Подключаем List (список)
 
-public class CraftingStation : MonoBehaviour // Класс крафт-станции
+public class CraftingStation : MonoBehaviour
 {
-    public Transform SpawnPoint; // Точка появления результата
+    public Transform SpawnPoint; // Точка, где появится результат крафта
 
-    public GameObject ResultItem; // Префаб результата
+    public Recipe Recipe; // Рецепт, по которому работает эта станция
 
-    public string[] RequiredTags; // Массив тегов для рецепта (например: "Wood", "Stone")
+    // Список всех предметов, которые сейчас лежат внутри триггера станции
+    private List<ItemObject> _itemsInTrigger = new();
 
-    private GameObject[] _itemsInTrigger = new GameObject[10]; // Массив предметов внутри триггера
-
-    private int _currentItems = 0; // Количество предметов в триггере
-
-    //========================================================
-    // 📦 Вход в триггер
-    //========================================================
-    private void OnTriggerEnter(Collider other) // Когда объект входит
+    // Вызывается, когда объект входит в триггер
+    private void OnTriggerEnter(Collider other) 
     {
-        if (other.GetComponent<Rigidbody>() != null) // Проверяем, что это физический объект
-        {
-            if (_currentItems < _itemsInTrigger.Length) // Есть ли место в массиве
-            {
-                _itemsInTrigger[_currentItems] = other.gameObject; // Добавляем объект
-                _currentItems++; // Увеличиваем счётчик
-            }
-        }
+        ItemObject itemObject = other.GetComponent<ItemObject>();
+        // Пытаемся получить компонент ItemObject (это значит, что объект — предмет)
+
+        if (itemObject == null) return;
+        // Если это НЕ предмет — выходим (игнорируем)
+
+        _itemsInTrigger.Add(itemObject);
+        // Добавляем предмет в список (теперь станция его "видит")
     }
 
-    //========================================================
-    // 📦 Выход из триггера
-    //========================================================
-    private void OnTriggerExit(Collider other) // Когда объект выходит
+    // Когда объект выходит из триггера
+    private void OnTriggerExit(Collider other) 
     {
-        for (int i = 0; i < _itemsInTrigger.Length; i++) // Перебираем массив
-        {
-            if (_itemsInTrigger[i] == other.gameObject) // Если нашли объект
-            {
-                _itemsInTrigger[i] = null; // Удаляем его
-                _currentItems--; // Уменьшаем счётчик
-                break; // Выходим
-            }
-        }
+        ItemObject itemObject = other.GetComponent<ItemObject>();
+        // Пытаемся получить предмет
+
+        if (itemObject == null) return;
+        // Если это не предмет — выходим
+
+        _itemsInTrigger.Remove(itemObject);
+        // Удаляем предмет из списка (он больше не участвует в крафте)
     }
 
-    //========================================================
-    // 🎮 Нажатие E
-    //========================================================
-    private void OnInteract(InputValue value) // Метод Input System
+    // Этот метод вызывается при зажатии кнопки E
+    private void OnInteract() 
     {
-        if (value.isPressed) // Проверяем нажатие
-        {
-            TryCraft(); // Пытаемся крафтить
-        }
+        TryCraft(); // Пытаемся выполнить крафт
     }
 
-    //========================================================
-    // 🔍 Проверка рецепта
-    //========================================================
-    private void TryCraft() // Проверяем, можно ли крафтить
+    // Проверяем, можно ли крафтить
+    private void TryCraft() 
     {
-        Camera cam = Camera.main; // Получаем камеру
+        Camera cam = Camera.main; // Получаем камеру игрока
 
-        Ray ray = new Ray(cam.transform.position, cam.transform.forward); // Луч вперёд
+        // Создаём луч вперёд (куда смотрит игрок)
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
-        RaycastHit hit; // Информация о попадании
+        RaycastHit hit; // Переменная для информации о попадании
 
-        if (Physics.Raycast(ray, out hit, 3f)) // Проверяем попадание
+        if (Physics.Raycast(ray, out hit, 3f)) // Проверяем, попали ли лучом
         {
-            if (hit.collider.gameObject != gameObject) // Если смотрим не на станцию
-            {
-                return; // Выходим
-            }
+            // Если смотрим НЕ на эту станцию
+            if (hit.collider.gameObject != gameObject) return; // Выходим (нельзя крафтить)
         }
-        else // Если вообще никуда не попали
+        else return; // Если вообще никуда не попали - Выходим
+
+        // Массив: какие предметы уже использованы (false = свободен)
+        bool[] used = new bool[_itemsInTrigger.Count];
+
+        // Проверяем рецепт
+        // Перебираем каждый предмет, который нужен по рецепту
+        for (int i = 0; i < Recipe.ItemsForCraft.Count; i++)
         {
-            return; // Выходим
-        }
+            // Флаг: нашли ли подходящий предмет
+            bool found = false;
 
-        // Создаём массив, чтобы отмечать использованные предметы
-        bool[] used = new bool[_itemsInTrigger.Length]; // false = ещё не использован
-
-        // Проверяем каждый тег из рецепта
-        for (int i = 0; i < RequiredTags.Length; i++) // Перебираем рецепт
-        {
-            bool found = false; // Нашли ли предмет под этот тег
-
-            for (int j = 0; j < _itemsInTrigger.Length; j++) // Перебираем предметы в триггере
+            // Перебираем ВСЕ предметы в триггере
+            for (int j = 0; j < _itemsInTrigger.Count; j++)
             {
-                if (_itemsInTrigger[j] != null) // Если есть предмет
+                // Если ячейка пустая — пропускаем
+                if (_itemsInTrigger[j] == null) continue;
+
+                // Если предмет уже использован — пропускаем
+                if (used[j]) continue;
+
+                // Проверяем: совпадает ли тип предмета с требуемым
+                if (_itemsInTrigger[j].ItemType == Recipe.ItemsForCraft[i])
                 {
-                    if (!used[j]) // Если он ещё не использован
-                    {
-                        if (_itemsInTrigger[j].CompareTag(RequiredTags[i])) // Если тег совпадает
-                        {
-                            used[j] = true; // Помечаем как использованный
-                            found = true; // Отмечаем, что нашли
-                            break; // Переходим к следующему тегу
-                        }
-                    }
+                    // Помечаем предмет как использованный
+                    used[j] = true;
+
+                    // Отмечаем, что нашли нужный предмет
+                    found = true;
+
+                    // Выходим и ищем следующий предмет из рецепта
+                    break;
                 }
             }
 
-            if (!found) // Если НЕ нашли предмет под нужный тег
+            // Если НЕ нашли предмет под текущую часть рецепта
+            if (!found)
             {
-                return; // Крафт невозможен
+                // Прерываем — крафт невозможен
+                return;
             }
         }
 
-        Craft(used); // Если всё найдено — крафтим
+        // Если все предметы найдены — выполняем крафт
+        Craft(used);
     }
 
-    //========================================================
-    // ⚙️ Крафт
-    //========================================================
-    private void Craft(bool[] used) // Передаём массив использованных предметов
+    // Метод крафта
+    private void Craft(bool[] used) 
     {
-        for (int i = 0; i < _itemsInTrigger.Length; i++) // Перебираем все предметы
+        // Идём С КОНЦА списка (важно при удалении!)
+        for (int i = _itemsInTrigger.Count - 1; i >= 0; i--)
         {
-            if (_itemsInTrigger[i] != null) // Если есть объект
-            {
-                if (used[i]) // Если он был использован в рецепте
-                {
-                    Destroy(_itemsInTrigger[i]); // Удаляем объект
+            // Пропускаем пустые элементы
+            if (_itemsInTrigger[i] == null) continue;
 
-                    _itemsInTrigger[i] = null; // Очищаем ячейку
+            // Пропускаем предметы, которые не участвуют в рецепте
+            if (used[i] == false) continue;
 
-                    _currentItems--; // Уменьшаем счётчик
-                }
-            }
+            // Сохраняем ссылку на предмет
+            ItemObject removedItem = _itemsInTrigger[i];
+
+            // Удаляем из списка (ВАЖНО: именно по индексу)
+            _itemsInTrigger.RemoveAt(i);
+
+            // Удаляем объект со сцены
+            Destroy(removedItem.gameObject);
         }
 
-        Instantiate(ResultItem, SpawnPoint.position, Quaternion.identity);
-        // Создаём результат
+        // Создаём результат крафта в заданной точке
+        Instantiate(Recipe.ResultObject, SpawnPoint.position, Quaternion.identity);
     }
 }
